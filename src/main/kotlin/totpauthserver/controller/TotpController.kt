@@ -30,7 +30,8 @@ class TotpCont(
             default location is "/etc/totpauthserver/secrets.json
             or "C:\ProgramData\secrets.json" - stored in %ALLUSERSPROFILE%
             
-            Default location is changed by "SECRETFOLDER" env var (not validated)
+            Default location is changed by "SECRETFOLDER" environment variable (not validated)
+            Default port is changed by "MICRONAUT_SERVER_PORT" variable
             
             
             # Authenticate a client token (via cookie)

@@ -25,6 +25,25 @@ class AuthController(
 ) {
 
     // authenticate cookie token for a specific ID
+    @Get("/verify/{id}/{token}", produces = [MediaType.TEXT_PLAIN])
+    fun manualVerifyAuthMapping(
+        @PathVariable("id") id: String,
+        @PathVariable("token") token: String,
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
+        if (id.isBlank()) {
+            println("500 - ID path variable blank for token authentication")
+            return HttpResponse.status(500, "Bad service ID [$id]")
+        }
+        if (token.isBlank()) return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+
+        val auth = authService.authToken(token, id)
+        if (auth) return HttpResponse.status<String?>(HttpStatus.OK).body("ok")
+        return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+    }
+
+
+    // authenticate cookie token for a specific ID
     @Get("/verify/{id}", produces = [MediaType.TEXT_PLAIN])
     fun verifyAuth(
         @PathVariable("id") id: String,
