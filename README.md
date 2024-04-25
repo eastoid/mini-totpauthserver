@@ -11,7 +11,9 @@ To change the location of the secrets save file, change `SECRETFOLDER` variable 
 
 Example: `SECRETFOLDER=/etc/newfolder`
 
-To change the default port from 8082, change the `SERVERPORT` variable.
+To change the default port from 8082, set the `MICRONAUT_SERVER_PORT` variable.
+
+Example: `MICRONAUT_SERVER_PORT=9090`
 
 ---
 
