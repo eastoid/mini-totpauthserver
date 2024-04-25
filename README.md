@@ -5,6 +5,15 @@ Intended to work with Nginx `auth_request`
 Uses Micronaut framework
 
 ---
+### Environment variables
+
+To change the location of the secrets save file, change `SECRETFOLDER` variable to the parent folder of the json.
+
+Example: `SECRETFOLDER=/etc/newfolder`
+
+To change the default port from 8082, change the `SERVERPORT` variable.
+
+---
 
 TOTP secrets are saved under unique IDs, which are also used as usernames.
 TOTP secrets are saved in a json file. 
