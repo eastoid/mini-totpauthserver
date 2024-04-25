@@ -5,6 +5,14 @@ Intended to work with Nginx `auth_request`
 Uses Micronaut framework
 
 ---
+
+### Warning
+
+Do not expose the server port, TOTP secret deleting and adding is not authenticated.
+
+Secrets cannot be viewed via http by default and must be inspected in secrets.json.
+
+---
 ### Environment variables
 
 To change the location of the secrets save file, change `SECRETFOLDER` variable to the parent folder of the json.
@@ -17,6 +25,12 @@ Example: `MICRONAUT_SERVER_PORT=9090`
 
 ---
 
+Cookie format is `authtoken-someId`
+
+Each secret ID has its own cookie.
+
+<br>
+
 TOTP secrets are saved under unique IDs, which are also used as usernames.
 TOTP secrets are saved in a json file. 
 
@@ -26,42 +40,47 @@ Default locations:
 
 ---
 
-Authenticate a client token (via cookie):
-`/auth/verify/{id}`
-200 "ok" or 401 "unauthorized"
-
-
-Verify a TOTP code:
-`/totp/verify/{id}/{token}`
-200 "ok" or 401 "unauthorized"
-
-
-Generate TOTP secret:
-`/totp/new`
-
-
-Save TOTP secret under an ID:
-`/totp/save/{id}/{secret}`
-
-
-Delete a TOTP secret via ID:
-`/totp/delete/{id}`
-
-
-List available IDs:
-`/totp/list`
-
-
-Serves login page:
 `/auth/loginpage`
+Serves login page
 
 
-Login POST endpoint - POST params `id` and `totp`:
 `/auth/login`
+Login POST endpoint - POST params `id` and `totp`
 
-Logs client out of specific ID:
+
+`/totp/list`
+List available IDs
+
+
+`/totp/save/{id}/{secret}`
+Save TOTP secret under an ID
+
+
+`/totp/delete/{id}`
+Delete a TOTP secret via ID
+
+
+`/totp/new`
+Generate TOTP secret
+
+
 `/auth/logout/{id}`
+Logs client out of specific ID
 
+
+Below endpoints return <ins>200</ins> "ok" or <ins>401</ins> "unauthorized"
+
+
+`/auth/verify/{id}`
+Authenticate a client token (via cookie)
+
+
+`/auth/verify/{id}/{token}`
+Authenticate a client token
+
+
+`/totp/verify/{id}/{code}`
+Verify a TOTP code
 
 ---
 
