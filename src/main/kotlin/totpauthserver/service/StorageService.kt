@@ -1,5 +1,6 @@
 package totpauthserver.service
 
+import io.micronaut.context.annotation.Context
 import jakarta.inject.Singleton
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -14,7 +15,7 @@ import kotlin.system.exitProcess
 
 
 
-
+@Context
 @Singleton
 class StorageService {
 
@@ -33,7 +34,6 @@ class StorageService {
     init {
         path = System.getenv("SECRETFOLDER").let {
             if (it != null && it.isNotBlank()) {
-                println("Storage location changed to [$it]")
                 return@let it
             }
             if (isWindows) {
@@ -44,6 +44,8 @@ class StorageService {
         }
 
         secretsFile = if (isWindows) "$path\\secrets.json" else "$path/secrets.json"
+
+        println("Storing secrets in $secretsFile")
 
         initFolder()
     }

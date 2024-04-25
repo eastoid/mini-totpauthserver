@@ -60,7 +60,7 @@ micronaut {
         convertYamlToJava.set(false)
         precomputeOperations.set(true)
         cacheEnvironment.set(true)
-        optimizeClassLoading.set(true)
+        optimizeClassLoading.set(false)
         deduceEnvironment.set(true)
         optimizeNetty.set(true)
     }

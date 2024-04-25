@@ -15,21 +15,25 @@ Secrets cannot be viewed via http by default and must be inspected in secrets.js
 ---
 ### Environment variables
 
-To change the location of the secrets save file, change `SECRETFOLDER` variable to the parent folder of the json.
+- To change the location of the secrets save file, change `SECRETFOLDER` variable to the parent folder of the json.
 
-Example: `SECRETFOLDER=/etc/newfolder`
+    Example: `SECRETFOLDER=/etc/newfolder`
 
-To change the default port from 8082, set the `MICRONAUT_SERVER_PORT` variable.
 
-Example: `MICRONAUT_SERVER_PORT=9090`
+-  To change the default port from 8082, set the `MICRONAUT_SERVER_PORT` variable. 
+
+    Example: `MICRONAUT_SERVER_PORT=9090`
+
+
+- To change the default auth token TTL, set `TOKENTTL` in seconds.
+
+    Example: `TOKENTTL=100`
 
 ---
 
 Cookie format is `authtoken-someId`
 
 Each secret ID has its own cookie.
-
-<br>
 
 TOTP secrets are saved under unique IDs, which are also used as usernames.
 TOTP secrets are saved in a json file. 

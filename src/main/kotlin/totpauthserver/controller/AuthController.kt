@@ -85,7 +85,7 @@ class AuthController(
 
         val token = authService.saveToken(body.id)
         val cookie = Cookie.of("authtoken-${body.id}", token).apply {
-            maxAge(305)
+            maxAge(authService.ttl)
             path("/")
             httpOnly(true)
             secure(true)

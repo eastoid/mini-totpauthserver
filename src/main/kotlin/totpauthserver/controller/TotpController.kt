@@ -32,7 +32,7 @@ class TotpCont(
             
             Default location is changed by "SECRETFOLDER" environment variable (not validated)
             Default port is changed by "MICRONAUT_SERVER_PORT" variable
-            
+            Default auth token TTL is changed by "TOKENTTL" variable
             
             # Authenticate a client token (via cookie)
             # 200 "ok" or 401 "unauthorized"

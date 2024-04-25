@@ -1,5 +1,6 @@
 package totpauthserver.service
 
+import io.micronaut.context.annotation.Context
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import jakarta.inject.Singleton
 import totpauthserver.model.AuthTokenInfoModel
@@ -7,6 +8,7 @@ import java.time.Instant
 import java.util.*
 import kotlin.collections.LinkedHashMap
 
+@Context
 @Singleton
 class AuthService {
 
@@ -14,6 +16,12 @@ class AuthService {
     var removedTokens = 0
     var total = 0
     val startTime = Instant.now()
+
+    val ttl = System.getenv("TOKENTTL")?.toLongOrNull() ?: 300L
+
+    init {
+        println("Auth Token TTL is $ttl")
+    }
 
     fun authToken(token: String, id: String): Boolean {
         removeExpiredTokens()
@@ -61,7 +69,7 @@ class AuthService {
         val issued = Instant.ofEpochSecond(this)
         val now = Instant.now()
 
-        return issued.plusSeconds(300).isBefore(now)
+        return issued.plusSeconds(ttl).isBefore(now)
     }
 
     fun saveToken(id: String): String {
