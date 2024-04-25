@@ -25,7 +25,7 @@ Secrets cannot be viewed via http by default and must be inspected in secrets.js
     Example: `MICRONAUT_SERVER_PORT=9090`
 
 
-- To change the default auth token TTL, set `TOKENTTL` in seconds.
+- To change the default auth token TTL from 300s, set `TOKENTTL` in seconds.
 
     Example: `TOKENTTL=100`
 
