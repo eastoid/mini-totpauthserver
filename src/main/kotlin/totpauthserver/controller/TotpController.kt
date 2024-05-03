@@ -7,6 +7,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.PathVariable
 import totpauthserver.service.AuthService
+import totpauthserver.service.StorageService
 import totpauthserver.service.TotpService
 import java.time.Instant
 
@@ -14,7 +15,8 @@ import java.time.Instant
 @Controller("/totp")
 class TotpCont(
     private val totpService: TotpService,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val storageService: StorageService
 ) {
 
 
@@ -45,8 +47,8 @@ class TotpCont(
             # Generate TOTP secret
             /totp/new
             
-            # Save TOTP secret under an ID
-            /totp/save/{id}/{secret}
+            # Save TOTP secret under an ID with, with ttl (seconds)
+            /totp/save/{id}/{ttl}/{secret}
             
             # Delete a TOTP secret via ID
             /totp/delete/{id}
@@ -63,9 +65,34 @@ class TotpCont(
             # Logs client out of specific ID
             /auth/logout/{id}
             
+            # Reloads secrets from the file, with logout all users option (boolean)
+            /totp/reload/{logout}
+            
             
             https://github.com/eastoid/mini-totpauthserver
         """.trimIndent()
+    }
+
+
+    // reload all secrets from file (option to log out all users)
+    @Get("/reload/{logout}", produces = [MediaType.TEXT_PLAIN])
+    fun reloadSecretsMapping(
+        @PathVariable("logout") rawLogout: String
+    ): HttpResponse<String> {
+        println("${Instant.now()} [>] /totp/reload/$rawLogout")
+
+        val logout = rawLogout.toBooleanStrictOrNull() ?: return HttpResponse.status<String>(HttpStatus.BAD_REQUEST).body("Wrong parameter (/totp/logout/{boolean})")
+        storageService.reload()
+        authService.reload(logout)
+
+        println("Reloaded secrets (logout all users: $logout)")
+        return HttpResponse.ok<String?>().body("Reloaded secrets (logout all users: $logout)")
+    }
+
+    @Get("/reload", produces = [MediaType.TEXT_PLAIN])
+    fun reloadSecretsErrorMapping(): HttpResponse<String> {
+        println("${Instant.now()} (Missing path variable) [>] /totp/reload")
+        return HttpResponse.status<String?>(HttpStatus.BAD_REQUEST).body("Missing path variable - \"/totp/reload\" instead of \"totp/reload/false\" \ntrue or false whether to log out all users")
     }
 
 
@@ -76,7 +103,11 @@ class TotpCont(
         @PathVariable("code") code: String,
     ): HttpResponse<String> {
         println("${Instant.now()} [>] /totp/verify/$id/$code")
-        val r = totpService.verify(code, id)
+
+        val secret = storageService.getSecretById(id)
+        if (secret.first != 200) return HttpResponse.status<String?>(HttpStatus.valueOf(secret.first)).body(secret.second)
+
+        val r = totpService.verify(secret.third!!, code)
         if (r.first) {
             if (r.second == "false") {
                 return HttpResponse.status<String>(HttpStatus.UNAUTHORIZED).body("unauthorized")
@@ -84,7 +115,7 @@ class TotpCont(
             return HttpResponse.status<String>(HttpStatus.OK).body("ok")
         }
 
-        return HttpResponse.status<String>(HttpStatus.INTERNAL_SERVER_ERROR).body("${r.first};${r.second}")
+        return HttpResponse.status<String>(HttpStatus.INTERNAL_SERVER_ERROR).body("error: ${r.second}")
     }
 
 
@@ -97,13 +128,17 @@ class TotpCont(
 
 
     // save totp secret under ID
-    @Get("/save/{id}/{secret}", produces = [MediaType.TEXT_PLAIN])
+    @Get("/save/{id}/{ttl}/{secret}", produces = [MediaType.TEXT_PLAIN])
     fun saveSecret(
         @PathVariable("id") id: String,
-        @PathVariable("secret") secret: String
+        @PathVariable("ttl") rawTtl: String,
+        @PathVariable("secret") secret: String,
     ): HttpResponse<String> {
-        println("${Instant.now()} [>] /totp/save/$id/*****")
-        val r = totpService.save(id, secret)
+        println("${Instant.now()} [>] /totp/save/$id/$rawTtl/*****")
+
+        val ttl = rawTtl.toLongOrNull() ?: return HttpResponse.status<String?>(HttpStatus.BAD_REQUEST).body("Bad TTL seconds")
+        val r = totpService.save(id, secret, ttl)
+
         if (!r.first) return HttpResponse.status<String>(HttpStatus.INTERNAL_SERVER_ERROR).body(r.second)
         return HttpResponse.status<String?>(HttpStatus.OK).body(r.second)
     }

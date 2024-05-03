@@ -4,8 +4,10 @@ import io.micronaut.context.annotation.Context
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import jakarta.inject.Singleton
 import totpauthserver.model.AuthTokenInfoModel
+import totpauthserver.model.SecretModel
 import java.time.Instant
 import java.util.*
+import kotlin.collections.HashMap
 import kotlin.collections.LinkedHashMap
 
 @Context
@@ -13,20 +15,27 @@ import kotlin.collections.LinkedHashMap
 class AuthService {
 
     private val tokens = LinkedHashMap<String, AuthTokenInfoModel>()
+    private val expirations = HashMap<String, Long>()
     var removedTokens = 0
     var total = 0
     val startTime = Instant.now()
 
-    val ttl = System.getenv("TOKENTTL")?.toLongOrNull() ?: 300L
+    val defaultTtl = System.getenv("TOKENTTL")?.toLongOrNull() ?: 300L
 
     init {
-        println("Auth Token TTL is $ttl")
+        println("Auth Token Default TTL is $defaultTtl")
     }
 
-    fun authToken(token: String, id: String): Boolean {
+
+    fun reload(logout: Boolean, ) {
+        if (logout) tokens.clear()
+        expirations.clear()
+    }
+
+    fun authToken(token: String, id: String, ): Boolean {
         removeExpiredTokens()
         val info = tokens[token] ?: return false
-        if (info.issuedAt.isExpired()) {
+        if (info.issuedAt.isExpired(info.id)) {
             tokens.remove(token)
             return false
         }
@@ -38,13 +47,13 @@ class AuthService {
     private fun removeExpiredTokens() {
         kotlin.runCatching {
             tokens.forEach {
-                if (it.value.issuedAt.isExpired()) {
+                if (it.value.issuedAt.isExpired(it.value.id)) {
                     tokens.remove(it.key)
                     removedTokens++
                     total++
                 }
             }
-            if (removedTokens % 40 == 0) {
+            if (removedTokens > 0 && removedTokens % 50 == 0) {
                 val now = Instant.now()
                 val since = now.epochSecond - startTime.epochSecond
                 val hrs = since / 3600
@@ -62,21 +71,26 @@ class AuthService {
                     tokens.remove(it.key)
                 }
             }
+            expirations.remove(id)
         }
     }
 
-    private fun Long.isExpired(): Boolean {
+    private fun Long.isExpired(id: String): Boolean {
         val issued = Instant.ofEpochSecond(this)
         val now = Instant.now()
 
-        return issued.plusSeconds(ttl).isBefore(now)
+        val ttl = expirations[id] ?: defaultTtl
+
+        return issued.plusSeconds(ttl.toLong()).isBefore(now)
     }
 
-    fun saveToken(id: String): String {
+    fun saveToken(secret: SecretModel): String {
         val token = "${UUID.randomUUID()}turbohomo${UUID.randomUUID()}"
-        val info = AuthTokenInfoModel(id, Instant.now().epochSecond)
 
+        val info = AuthTokenInfoModel(secret.id, Instant.now().epochSecond)
         tokens.put(token, info)
+
+        expirations.put(secret.id, secret.ttl)
         return token
     }
 

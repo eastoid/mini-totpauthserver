@@ -56,8 +56,8 @@ Login POST endpoint - POST params `id` and `totp`
 List available IDs
 
 
-`/totp/save/{id}/{secret}`
-Save TOTP secret under an ID
+`/totp/save/{id}/{ttl}/{secret}`
+Save TOTP secret under an ID, with seconds TTL
 
 
 `/totp/delete/{id}`
@@ -86,6 +86,10 @@ Authenticate a client token
 `/totp/verify/{id}/{code}`
 Verify a TOTP code
 
+
+`/totp/reload/{logout}`
+Reloads secrets from the file, with logout all users option (boolean)
+
 ---
 
 ### Nginx config example
@@ -111,7 +115,7 @@ location /totp/list {
 
 location = /authrequest {
     internal;
-    proxy_pass http://127.0.0.1:8082/auth/verify/exampleId;
+    proxy_pass http://127.0.0.1:8082/auth/verify/exampleId;  # App-specific ID
     proxy_set_header Content-Length "";
     proxy_pass_request_body off;
     proxy_set_header Cookie $http_cookie;
@@ -121,6 +125,12 @@ location = /authrequest {
 location /unauthorized {
     internal;
     proxy_pass http://127.0.0.1:8082/auth/loginpage;
+}
+
+location /myLogoutPath {
+    auth_request /authrequest;
+    error_page 401 403 =200 /unauthorized;
+    proxy_pass http://127.0.0.1:8082/auth/logout/exampleId;  # App-specific ID
 }
 
 location / {

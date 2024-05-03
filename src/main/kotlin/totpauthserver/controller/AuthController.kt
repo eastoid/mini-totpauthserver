@@ -15,13 +15,16 @@ import totpauthserver.service.AuthService
 import totpauthserver.service.TotpService
 import totpauthserver.model.LoginFormDataModel
 import org.thymeleaf.TemplateEngine
+import totpauthserver.model.SecretModel
+import totpauthserver.service.StorageService
 import java.time.Instant
 
 
 @Controller("/auth")
 class AuthController(
     private val authService: AuthService,
-    private val totpService: TotpService
+    private val totpService: TotpService,
+    private val storageService: StorageService
 ) {
 
     // authenticate cookie token for a specific ID
@@ -77,15 +80,18 @@ class AuthController(
     ): HttpResponse<String> {
         println("${Instant.now()} [>] /auth/login")
 
-        val auth = totpService.verify(body.totp, body.id)
+        val secret: Triple<Int, String?, SecretModel?> = storageService.getSecretById(body.id)
+        if (secret.first != 200) return HttpResponse.status<String?>(HttpStatus.valueOf(secret.first)).body(secret.second)
+
+        val auth = totpService.verify(secret.third!!, body.totp) // if secret.first is 200, secret.third (SecretModel) is not null
         if (!auth.first || auth.second != "true") {
             println("${request.remoteAddress.address.hostAddress} [>] \"${body.id}\" Fail (input totp: ${body.totp})")
             return HttpResponse.unauthorized<String?>().body(auth.second)
         }
 
-        val token = authService.saveToken(body.id)
+        val token = authService.saveToken(secret.third!!)
         val cookie = Cookie.of("authtoken-${body.id}", token).apply {
-            maxAge(authService.ttl)
+            maxAge(secret.third!!.ttl)
             path("/")
             httpOnly(true)
             secure(true)

@@ -3,6 +3,7 @@ package totpauthserver.service
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import jakarta.inject.Singleton
+import totpauthserver.model.SecretModel
 import java.security.SecureRandom
 
 @Singleton
@@ -10,11 +11,8 @@ class TotpService(
     private val storageService: StorageService
 ) {
 
-    fun verify(code: String, id: String): Pair<Boolean, String> {
-        val secretString = storageService.getSecretById(id)
-        if (!secretString.first) return secretString
-
-        val secret = TOTPSecret.fromBase32EncodedString(secretString.second)
+    fun verify(model: SecretModel, code: String): Pair<Boolean, String> {
+        val secret = TOTPSecret.fromBase32EncodedString(model.secret)
         val totpGenerator = TOTPGenerator()
         val totp = totpGenerator.generateCurrent(secret)
         return true to (code == totp.value).toString()
@@ -28,8 +26,8 @@ class TotpService(
         }
     }
 
-    fun save(id: String, secret: String): Pair<Boolean, String> {
-        return storageService.saveSecret(id, secret)
+    fun save(id: String, secret: String, ttl: Long): Pair<Boolean, String> {
+        return storageService.saveSecret(id, secret, ttl)
     }
 
     fun delete(id: String): Pair<Boolean, String> {

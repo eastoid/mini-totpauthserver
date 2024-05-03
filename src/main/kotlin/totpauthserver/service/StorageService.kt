@@ -19,7 +19,7 @@ import kotlin.system.exitProcess
 @Singleton
 class StorageService {
 
-    private val secretCache = LinkedHashMap<String, String>()
+    private val secretCache = LinkedHashMap<String, Pair<String, Long>>()
 
     private val osName: String = System.getProperty("os.name").lowercase(Locale.getDefault())
     private val isWindows = osName.contains("win")
@@ -50,6 +50,12 @@ class StorageService {
         initFolder()
     }
 
+
+    fun reload() {
+        secretCache.clear()
+    }
+
+
     fun initFolder(): Boolean {
         kotlin.runCatching {
             val file = File(path)
@@ -73,7 +79,7 @@ class StorageService {
     }
 
 
-    fun saveSecret(id: String, secret: String): Pair<Boolean, String> {
+    fun saveSecret(id: String, secret: String, ttl: Long): Pair<Boolean, String> {
         val file = let {
             val file = File(secretsFile)
             if (!file.exists()) createSecretsFile()
@@ -96,7 +102,7 @@ class StorageService {
             }
         }
 
-        parsed.add(SecretModel(id, secret))
+        parsed.add(SecretModel(id, secret, ttl))
 
         val serialized = kotlin.runCatching {
             Json.encodeToString(parsed)
@@ -160,33 +166,33 @@ class StorageService {
     }
 
 
-    fun getSecretById(id: String): Pair<Boolean, String> {
+    fun getSecretById(id: String): Triple<Int, String?, SecretModel?> {
         secretCache[id]?.let {
-            return true to it
+            return Triple(200, null, SecretModel(id, it.first, it.second))
         }
         val file = readFile(secretsFile)
-        if (!file.first) return file
+        if (!file.first) return Triple(500, file.second, null)
 
         val parsed = kotlin.runCatching {
             Json.decodeFromString<List<SecretModel>>(file.second)
         }.getOrElse {
             it.printStackTrace()
             println("\nError parsing secrets file to id [$id]")
-            return false to "Error parsing secrets file\n${it.stackTraceToString()}"
+            return Triple(500, "Error parsing secrets file\n${it.stackTraceToString()}", null)
         }
 
         parsed.forEach {
             if (it.id == id) {
-                secretCache[it.id] = it.secret
+                secretCache[it.id] = it.secret to it.ttl
                 while (secretCache.size > 100) {
                     val k = secretCache.firstEntry().key
                     secretCache.remove(k)
                 }
-                return true to it.secret
+                return Triple(200, null, SecretModel(id, it.secret, it.ttl))
             }
         }
 
-        return false to "ID [$id] does not exist."
+        return Triple(404, "ID [$id] does not exist.", null)
     }
 
 
