@@ -72,6 +72,10 @@ Generate TOTP secret
 Logs client out of specific ID
 
 
+`/totp/reload/{logout}`
+Reloads secrets from the file, with logout all users option (boolean)
+
+
 Below endpoints return <ins>200</ins> "ok" or <ins>401</ins> "unauthorized"
 
 
@@ -86,9 +90,6 @@ Authenticate a client token
 `/totp/verify/{id}/{code}`
 Verify a TOTP code
 
-
-`/totp/reload/{logout}`
-Reloads secrets from the file, with logout all users option (boolean)
 
 ---
 
