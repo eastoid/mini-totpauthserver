@@ -10,7 +10,7 @@ Uses Micronaut framework
 
 Do not expose the server port, TOTP secret deleting and adding is not authenticated.
 
-Secrets cannot be viewed via http by default and must be inspected in secrets.json.
+Secrets cannot be viewed via http and must be inspected in secrets.json.
 
 ---
 ### Environment variables
@@ -38,11 +38,21 @@ Each secret ID has its own cookie.
 TOTP secrets are saved under unique IDs, which are also used as usernames.
 TOTP secrets are saved in a json file. 
 
+All secrets are loaded in memory at startup. Any changes to secrets.json must be loaded with 
+`/totp/reload/{logoutAll}`
+
+If secrets.json becomes corrupted or inaccessible, certain functions such as saving or deleting secrets becomes disabled. Any issues have to be fixed manually.
+
 Default locations:
 - Windows: `C:\ProgramData\totpauthserver\secrets.json` - %ALLUSERSPROFILE%
 - Linux: `/etc/totpauthserver/secrets.json`
 
 ---
+
+
+`/logs/{amount}`
+Shows selected number of last logs
+
 
 `/auth/loginpage`
 Serves login page
@@ -76,7 +86,7 @@ Logs client out of specific ID
 Reloads secrets from the file, with logout all users option (boolean)
 
 
-Below endpoints return <ins>200</ins> "ok" or <ins>401</ins> "unauthorized"
+Below endpoints return <ins>200</ins> "ok" or <ins>401</ins> "unauthorized" (or 400 if input is invalid)
 
 
 `/auth/verify/{id}`

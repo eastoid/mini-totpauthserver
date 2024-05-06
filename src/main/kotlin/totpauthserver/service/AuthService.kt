@@ -12,7 +12,9 @@ import kotlin.collections.LinkedHashMap
 
 @Context
 @Singleton
-class AuthService {
+class AuthService(
+    private val logger: LogService
+) {
 
     private val tokens = LinkedHashMap<String, AuthTokenInfoModel>()
     private val expirations = HashMap<String, Long>()
@@ -23,9 +25,14 @@ class AuthService {
     val defaultTtl = System.getenv("TOKENTTL")?.toLongOrNull() ?: 300L
 
     init {
-        println("Auth Token Default TTL is $defaultTtl")
+        logger.log("Auth Token Default TTL is $defaultTtl")
+        logger.log("For help do HTTP GET /help")
     }
 
+
+    fun logout(id: String, token: String) {
+        tokens.remove(token)
+    }
 
     fun reload(logout: Boolean, ) {
         if (logout) tokens.clear()
@@ -58,7 +65,7 @@ class AuthService {
                 val since = now.epochSecond - startTime.epochSecond
                 val hrs = since / 3600
                 val days = since / 86400
-                println("[i] Removed $removedTokens tokens ($total total) - since ${hrs}hrs / ${days}days ago")
+                logger.log("[i] Removed $removedTokens tokens ($total total) - since ${hrs}hrs / ${days}days ago")
                 removedTokens = 0
             }
         }

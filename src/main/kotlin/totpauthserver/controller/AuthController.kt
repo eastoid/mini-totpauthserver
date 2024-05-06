@@ -11,12 +11,10 @@ import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.views.ModelAndView
-import totpauthserver.service.AuthService
-import totpauthserver.service.TotpService
 import totpauthserver.model.LoginFormDataModel
 import org.thymeleaf.TemplateEngine
 import totpauthserver.model.SecretModel
-import totpauthserver.service.StorageService
+import totpauthserver.service.*
 import java.time.Instant
 
 
@@ -24,10 +22,11 @@ import java.time.Instant
 class AuthController(
     private val authService: AuthService,
     private val totpService: TotpService,
-    private val storageService: StorageService
-) {
+    private val storageService: StorageService,
+    private val logger: LogService
+) : BaseController() {
 
-    // authenticate cookie token for a specific ID
+    // authenticate cookie token for a specific ID by path variable token
     @Get("/verify/{id}/{token}", produces = [MediaType.TEXT_PLAIN])
     fun manualVerifyAuthMapping(
         @PathVariable("id") id: String,
@@ -35,14 +34,14 @@ class AuthController(
         request: HttpRequest<*>
     ): HttpResponse<String> {
         if (id.isBlank()) {
-            println("500 - ID path variable blank for token authentication")
+            logger.log("500 - ID path variable blank for token authentication")
             return HttpResponse.status(500, "Bad service ID [$id]")
         }
-        if (token.isBlank()) return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+        if (token.isBlank()) return unauthorized("unauthorized")
 
         val auth = authService.authToken(token, id)
-        if (auth) return HttpResponse.status<String?>(HttpStatus.OK).body("ok")
-        return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+        if (auth) return ok("ok")
+        return unauthorized("unauthorized")
     }
 
 
@@ -52,23 +51,22 @@ class AuthController(
         @PathVariable("id") id: String,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        if (id.isBlank()) {
-            println("500 - ID path variable blank for token authentication")
-            return HttpResponse.status(500, "Bad service ID [$id]")
-        }
+        logger.log("${Instant.now()} [>] /auth/verify/$id")
+        if (id.isEmpty()) return bad("Bad service ID [$id]")
+
         val cookie = request.cookies?.get("authtoken-$id")?.value
-        if (cookie.isNullOrBlank()) return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+        if (cookie.isNullOrBlank()) return unauthorized("unauthorized")
 
         val auth = authService.authToken(cookie, id)
-        if (auth) return HttpResponse.status<String?>(HttpStatus.OK).body("ok")
-        return HttpResponse.status<String?>(HttpStatus.UNAUTHORIZED).body("unauthorized")
+        if (auth) return ok("ok")
+        return unauthorized("unauthorized")
     }
 
 
     // serve login page
     @Get("/loginpage", produces = [MediaType.TEXT_HTML])
     fun login(): ModelAndView<String> {
-        return ModelAndView<String>().apply { setView("login") }
+            return ModelAndView<String>().apply { setView("login-inline") }
     }
 
 
@@ -78,15 +76,19 @@ class AuthController(
         @Body body: LoginFormDataModel,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        println("${Instant.now()} [>] /auth/login")
+        logger.log("${Instant.now()} [>] /auth/login")
+
+        if (!serviceAvailable()) return unavailable()
+        if (body.id.isEmpty()) return bad("Invalid ID")
+        if (!body.totp.all { it.isDigit() }) return bad("Invalid TOTP")
 
         val secret: Triple<Int, String?, SecretModel?> = storageService.getSecretById(body.id)
         if (secret.first != 200) return HttpResponse.status<String?>(HttpStatus.valueOf(secret.first)).body(secret.second)
 
         val auth = totpService.verify(secret.third!!, body.totp) // if secret.first is 200, secret.third (SecretModel) is not null
         if (!auth.first || auth.second != "true") {
-            println("${request.remoteAddress.address.hostAddress} [>] \"${body.id}\" Fail (input totp: ${body.totp})")
-            return HttpResponse.unauthorized<String?>().body(auth.second)
+            logger.log("${request.remoteAddress.address.hostAddress} [>] \"${body.id}\" Fail (input totp: ${body.totp})")
+            return unauthorized(auth.second)
         }
 
         val token = authService.saveToken(secret.third!!)
@@ -101,14 +103,24 @@ class AuthController(
 
 
     @Get("/logout/{id}", produces = [MediaType.TEXT_PLAIN])
-    fun logoutMapping(@PathVariable("id") id: String): HttpResponse<String> {
-        val cookie = Cookie.of("authtoken-$id", "logout-${Instant.now()}").apply {
+    fun logoutMapping(
+        @PathVariable("id") id: String,
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
+        if (id.isEmpty()) return bad("Invalid ID")
+
+        val cookie = request.cookies?.get("authtoken-$id")?.value
+        if (!cookie.isNullOrBlank()) {
+            authService.logout(id, cookie)
+        }
+
+        val newCookie = Cookie.of("authtoken-$id", "logout-${Instant.now()}").apply {
             maxAge(60)
             path("/")
             httpOnly(true)
             secure(true)
         }
-        return HttpResponse.ok<String?>().body("Logout").cookie(cookie)
+        return HttpResponse.ok<String?>().body("Logout [$id]").cookie(newCookie)
     }
 
 }

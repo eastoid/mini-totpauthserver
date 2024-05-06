@@ -13,12 +13,16 @@ import java.nio.file.StandardOpenOption
 import java.util.*
 import kotlin.system.exitProcess
 
-
+private var available = false
+fun serviceAvailable(): Boolean { return available }
 
 @Context
 @Singleton
-class StorageService {
+class StorageService(
+    private val logger: LogService
+) {
 
+    //                                      ID           SECRET  TTL
     private val secretCache = LinkedHashMap<String, Pair<String, Long>>()
 
     private val osName: String = System.getProperty("os.name").lowercase(Locale.getDefault())
@@ -27,9 +31,6 @@ class StorageService {
     private var path: String
 
     private var secretsFile: String
-
-    private var available = false
-
 
     init {
         path = System.getenv("SECRETFOLDER").let {
@@ -45,44 +46,76 @@ class StorageService {
 
         secretsFile = if (isWindows) "$path\\secrets.json" else "$path/secrets.json"
 
-        println("Storing secrets in $secretsFile")
+        logger.log("Storing secrets in $secretsFile")
 
         initFolder()
+        createSecretsFile()
+        loadSecrets()
     }
 
 
     fun reload() {
         secretCache.clear()
+        loadSecrets()
     }
 
 
-    fun initFolder(): Boolean {
+    fun loadSecrets() {
+        val file = readFile(secretsFile)
+        if (!file.first) {
+            available = false
+            for (i in 0..3) { logger.log("Secrets file is not loaded!") }
+            logger.log("ERROR: [${file.second}]")
+            available = false
+            return
+        }
+
+        val parsed = try {
+            Json.decodeFromString<List<SecretModel>>(file.second)
+        } catch (e: Exception) {
+            logger.log(e.stackTraceToString())
+            logger.log("ERROR - Failed to parse secrets file! It may be corrupted or badly formatted.")
+            available = false
+            return
+        }
+        logger.log("Loaded ${parsed.size} secrets from file")
+
+        parsed.forEach {
+            secretCache[it.id] = it.secret to it.ttl
+        }
+
+        available = true
+    }
+
+
+    fun initFolder() {
         kotlin.runCatching {
             val file = File(path)
             if (!file.exists()) {
                 val op = file.mkdirs()
                 if (!op) {
-                    println("Could not create folder [$path] for program data! Exiting.")
+                    logger.log("Could not create folder [$path] for program data! Exiting.")
                     exitProcess(1)
                 }
             }
-
-            available = file.exists()
-
-
         }.getOrElse {
-            it.printStackTrace()
+
+            logger.log(it.stackTraceToString())
             available = false
-            println("\nException while initializing storage folder [$path]")
+            logger.log("\nException while initializing storage folder [$path]")
         }
-        return available
     }
 
 
     fun saveSecret(id: String, secret: String, ttl: Long): Pair<Boolean, String> {
         val file = let {
             val file = File(secretsFile)
-            if (!file.exists()) createSecretsFile()
+            if (!file.exists()) {
+//                createSecretsFile()
+                available = false
+                logger.log("ERROR - Secrets file does not exist! Did not save secret [$id].")
+                return false to "Secrets file does not exist! Did not save secret."
+            }
             readFile(secretsFile)
         }
 
@@ -91,9 +124,10 @@ class StorageService {
         val parsed = kotlin.runCatching {
             Json.decodeFromString<List<SecretModel>>(file.second)
         }.getOrElse {
-            it.printStackTrace()
-            println("\nFailed to deserialize")
-            return false to "Failed to deserialize secrets file"
+            logger.log(it.stackTraceToString())
+            logger.log("Failed to deserialize secrets file! It may be corrupted or badly formatted. Failed to save ID [$id]")
+            available = false
+            return false to "Failed to deserialize secrets file.\n It may be corrupted or badly formatted. Did not save secret."
         }.toMutableList()
 
         parsed.forEach {
@@ -107,13 +141,16 @@ class StorageService {
         val serialized = kotlin.runCatching {
             Json.encodeToString(parsed)
         }.getOrElse {
-            it.printStackTrace()
-            println("\nFailed to serialize new secrets list file json")
-            return false to "Failed to save secrets file"
+            logger.log(it.stackTraceToString())
+            logger.log("Failed to serialize secrets into json. This is an unexpected error. Did not save ID [$id]")
+            available = false
+            return false to "Failed to save secrets file due to an unexpected serialization error. Did not save secret."
         }
 
         val writeOp = writeToFileOverwriting(secretsFile, serialized)
-        if (!writeOp) return false to "Error writing to secrets file"
+        if (!writeOp) return false to "Error writing to secrets file."
+
+        secretCache[id] = secret to ttl
 
         return true to "Saved secret [$id]."
     }
@@ -122,16 +159,16 @@ class StorageService {
     fun createSecretsFile(): Boolean {
         val file = File(secretsFile)
         if (file.exists()) {
-            println("Tried to create secret store file. Already exists.")
             return true
         }
+        logger.log("Secrets file not found. Creating new file.")
 
         try {
             Files.writeString(file.toPath(), "[]", StandardCharsets.UTF_8, StandardOpenOption.CREATE)
             return true
         } catch (e: Exception) {
-            e.printStackTrace()
-            println("\nException while writing empty json array into new file [${secretsFile}]")
+            logger.log(e.stackTraceToString())
+            logger.log("Error creating new secrets.json file [${secretsFile}]")
             return false
         }
     }
@@ -140,14 +177,16 @@ class StorageService {
     fun readFile(path: String): Pair<Boolean, String> {
         val file = File(path)
         if (!file.exists()) {
-            println("Failed to read file [$path] - doesnt exist")
-            return false to "Secrets file doesnt exist"
+            logger.log("Failed to read file [$path] - doesnt exist")
+            available = false
+            return false to "Secrets file doesnt exist. Aborting operation."
         }
         return kotlin.runCatching {
             true to Files.readString(file.toPath(), StandardCharsets.UTF_8)
         }.getOrElse {
-            it.printStackTrace()
-            println("\nFailed to read file [$path]")
+            logger.log(it.stackTraceToString())
+            logger.log("Failed to read file [$path]")
+            available = false
             false to "Error reading secrets file.\n${it.stackTraceToString()}"
         }
     }
@@ -159,8 +198,9 @@ class StorageService {
             Files.writeString(file.toPath(), content, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
             return true
         } catch (e: IOException) {
-            e.printStackTrace()
-            println("Error overwriting file content [$path]")
+            logger.log(e.stackTraceToString())
+            logger.log("Error writing into secrets file [$path]")
+            available = false
             return false
         }
     }
@@ -170,34 +210,14 @@ class StorageService {
         secretCache[id]?.let {
             return Triple(200, null, SecretModel(id, it.first, it.second))
         }
-        val file = readFile(secretsFile)
-        if (!file.first) return Triple(500, file.second, null)
-
-        val parsed = kotlin.runCatching {
-            Json.decodeFromString<List<SecretModel>>(file.second)
-        }.getOrElse {
-            it.printStackTrace()
-            println("\nError parsing secrets file to id [$id]")
-            return Triple(500, "Error parsing secrets file\n${it.stackTraceToString()}", null)
-        }
-
-        parsed.forEach {
-            if (it.id == id) {
-                secretCache[it.id] = it.secret to it.ttl
-                while (secretCache.size > 100) {
-                    val k = secretCache.firstEntry().key
-                    secretCache.remove(k)
-                }
-                return Triple(200, null, SecretModel(id, it.secret, it.ttl))
-            }
-        }
-
+        if (!serviceAvailable()) return Triple(404, "ID [$id] does not exist. (The service is unavailable due to an internal error!)", null)
         return Triple(404, "ID [$id] does not exist.", null)
     }
 
 
     fun deleteSecret(id: String): Pair<Boolean, String> {
         secretCache.remove(id)
+        if (!available) return false to "Service unavailable due to an internal error! Did not delete ID."
 
         val file = readFile(secretsFile)
         if (!file.first) return file
@@ -205,36 +225,29 @@ class StorageService {
         val parsed = kotlin.runCatching {
             Json.decodeFromString<List<SecretModel>>(file.second)
         }.getOrElse {
-            it.printStackTrace()
-            println("\nError parsing secrets file for deletion of [$id]")
-            return false to "Error parsing secrets file\n${it.stackTraceToString()}"
+            logger.log(it.stackTraceToString())
+            logger.log("Error parsing secrets file for deletion of [$id]")
+            available = false
+            return false to "Error parsing secrets file. It may be corrupted or badly formatted. Did not delete secret."
         }.filter { it.id != id }
 
         val serialized = kotlin.runCatching {
             Json.encodeToString(parsed)
         }.getOrElse {
-            it.printStackTrace()
-            println("\nError serializing secrets file for deletion of [$id]")
-            return false to "Failed to save secrets file"
+            logger.log(it.stackTraceToString())
+            logger.log("Error serializing secrets file for deletion of [$id]")
+            available = false
+            return false to "Error saving secrets file. Did not delete secret."
         }
 
         val op = writeToFileOverwriting(secretsFile, serialized)
-        return op to "deletion of [$id]"
+        if (op) available = true
+        return op to "Deleted ID [$id]"
     }
 
 
     fun getIdList(): List<String> {
-        val file = readFile(secretsFile)
-        if (!file.first) return listOf("Failed to read file: ${file.second}")
-        val parsed = kotlin.runCatching {
-            Json.decodeFromString<List<SecretModel>>(file.second)
-        }.getOrElse {
-            it.printStackTrace()
-            println("\nError parsing secrets file to get id list")
-            return listOf("Error parsing secrets file! Inspect console")
-        }.map { it.id }
-
-        return parsed
+        return secretCache.map { it.key }
     }
 
 }
