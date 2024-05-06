@@ -110,10 +110,6 @@ Server accessible on port 8082
 Change the internal `/authrequest` endpoint to contain the appropriate totp ID for your authenticated service, so that only the correct TOTP can be used to log in
 
 ``` 
-location /static/ {
-    proxy_pass http://127.0.0.1:8082/static/;
-}
-
 location /auth/login {
     auth_request off;
     proxy_pass http://127.0.0.1:8082/auth/login;
@@ -150,3 +146,9 @@ location / {
     proxy_pass http://127.0.0.1:5800/;
 }
 ```
+
+---
+
+### Other information
+
+Homepage uses **compiled** Tailwind CSS. 
