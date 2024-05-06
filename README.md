@@ -41,7 +41,7 @@ TOTP secrets are saved in a json file.
 All secrets are loaded in memory at startup. Any changes to secrets.json must be loaded with 
 `/totp/reload/{logoutAll}`
 
-If secrets.json becomes corrupted or inaccessible, certain functions such as saving or deleting secrets becomes disabled. Any issues have to be fixed manually.
+If secrets.json becomes corrupted or inaccessible, certain functions such as saving or deleting secrets becomes disabled. Any issues have to be fixed manually. When any issues are fixed, the reload endpoint can be called.
 
 Default locations:
 - Windows: `C:\ProgramData\totpauthserver\secrets.json` - %ALLUSERSPROFILE%

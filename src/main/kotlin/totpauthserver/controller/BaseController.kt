@@ -34,6 +34,7 @@ abstract class BaseController {
             Available: ${serviceAvailable()}
             
             If the service is unavailable, some functions become disabled.
+            Service can become unavailable if the secrets.json file is corrupted, badly formatted, or inaccessible.
             Console logs must be inspected, and once issues are fixed, the reload endpoint can be called.
             
             Cookies used are in format `authtoken-{id}` like `authtoken-myId`.
