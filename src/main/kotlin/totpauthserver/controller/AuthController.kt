@@ -23,7 +23,8 @@ class AuthController(
     private val authService: AuthService,
     private val totpService: TotpService,
     private val storageService: StorageService,
-    private val logger: LogService
+    private val logger: LogService,
+    private val securityService: SecurityService
 ) : BaseController() {
 
     // authenticate cookie token for a specific ID by path variable token
@@ -33,9 +34,9 @@ class AuthController(
         @PathVariable("token") token: String,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        if (id.isBlank()) {
-            logger.log("500 - ID path variable blank for token authentication")
-            return HttpResponse.status(500, "Bad service ID [$id]")
+        if (id.isEmpty()) {
+            logger.log("[Warning]  Internal endpoint: /auth/verify/$id/$token  -  Invalid service ID")
+            return HttpResponse.status(400, "Bad service ID [$id]")
         }
         if (token.isBlank()) return unauthorized("unauthorized")
 
@@ -51,7 +52,7 @@ class AuthController(
         @PathVariable("id") id: String,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /auth/verify/$id")
+        logger.log(endpointLogMessage(request, request.path))
         if (id.isEmpty()) return bad("Bad service ID [$id]")
 
         val cookie = request.cookies?.get("authtoken-$id")?.value
@@ -65,8 +66,11 @@ class AuthController(
 
     // serve login page
     @Get("/loginpage", produces = [MediaType.TEXT_HTML])
-    fun login(): ModelAndView<String> {
-            return ModelAndView<String>().apply { setView("login-inline") }
+    fun login(
+        request: HttpRequest<*>,
+    ): ModelAndView<String> {
+        logger.log(endpointLogMessage(request, request.path))
+        return ModelAndView<String>().apply { setView("login-inline") }
     }
 
 
@@ -76,7 +80,8 @@ class AuthController(
         @Body body: LoginFormDataModel,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /auth/login")
+        if (shouldRateLimit(request, "/login", 3)) return rateLimited()
+        logger.log(endpointLogMessage(request, request.path))
 
         if (!serviceAvailable()) return unavailable()
         if (body.id.isEmpty()) return bad("Invalid ID")
@@ -107,6 +112,7 @@ class AuthController(
         @PathVariable("id") id: String,
         request: HttpRequest<*>
     ): HttpResponse<String> {
+        logger.log(endpointLogMessage(request, request.path))
         if (id.isEmpty()) return bad("Invalid ID")
 
         val cookie = request.cookies?.get("authtoken-$id")?.value

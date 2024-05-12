@@ -1,5 +1,6 @@
 package totpauthserver.controller
 
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -17,15 +18,20 @@ class UtilController(
         return helpText()
     }
 
-    @Get(uris = ["/log", "/logs"], produces = [MediaType.TEXT_PLAIN])
-    fun logs(): String {
+    @Get(uris = ["/logs"], produces = [MediaType.TEXT_PLAIN])
+    fun logs(
+        request: HttpRequest<*>,
+    ): String {
+        endpointLogMessage(request, request.path)
         return getLogs(200)
     }
 
-    @Get(uris = ["/log/{amount}", "/logs/{amount}"], produces = [MediaType.TEXT_PLAIN])
+    @Get(uris = ["/logs/{amount}"], produces = [MediaType.TEXT_PLAIN])
     fun customAmountLogs(
-        @PathVariable("amount") rawAmount: String
+        @PathVariable("amount") rawAmount: String,
+        request: HttpRequest<*>,
     ): String {
+        endpointLogMessage(request, request.path)
         val amount = rawAmount.toIntOrNull() ?: return "Invalid log amount"
         return getLogs(amount)
     }

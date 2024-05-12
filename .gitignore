@@ -3,3 +3,4 @@
 build/
 *.ps1
 extract.ps1
+.temp.txt

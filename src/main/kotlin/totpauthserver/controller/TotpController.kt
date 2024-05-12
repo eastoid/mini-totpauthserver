@@ -1,5 +1,6 @@
 package totpauthserver.controller
 
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -15,22 +16,25 @@ class TotpController(
     private val totpService: TotpService,
     private val authService: AuthService,
     private val storageService: StorageService,
-    private val logger: LogService
+    private val logger: LogService,
 ) : BaseController() {
 
 
     @Get(uris = ["/help", "/", "/info"], produces = [MediaType.TEXT_PLAIN])
-    fun help(): String {
-        return helpText()
+    fun help(
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
+        return ok(helpText())
     }
 
 
     // reload all secrets from file (option to log out all users)
     @Get("/reload/{logout}", produces = [MediaType.TEXT_PLAIN])
     fun reloadSecretsMapping(
-        @PathVariable("logout") rawLogout: String
+        @PathVariable("logout") rawLogout: String,
+        request: HttpRequest<*>,
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /totp/reload/$rawLogout")
+            logger.log(endpointLogMessage(request, request.path))
 
         val logout = rawLogout.toBooleanStrictOrNull() ?: return bad("Wrong parameter (/totp/logout/{boolean})")
         storageService.reload()
@@ -42,8 +46,9 @@ class TotpController(
 
 
     @Get("/reload", produces = [MediaType.TEXT_PLAIN])
-    fun reloadSecretsErrorMapping(): HttpResponse<String> {
-        logger.log("${Instant.now()} (Missing path variable) [>] /totp/reload")
+    fun reloadSecretsErrorMapping(
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
         return bad("Missing path variable - \"/totp/reload\" instead of \"totp/reload/false\" \ntrue or false whether to log out all users")
     }
 
@@ -53,8 +58,9 @@ class TotpController(
     fun verifyCode(
         @PathVariable("id") id: String,
         @PathVariable("code") code: String,
+        request: HttpRequest<*>,
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /totp/verify/$id/$code")
+        logger.log(endpointLogMessage(request, request.path))
 
         if (id.isEmpty()) return bad("Invalid ID")
         if (!code.all { it.isDigit() }) return unauthorized("Invalid TOTP")
@@ -76,9 +82,11 @@ class TotpController(
 
     // generate totp secret
     @Get("/new", produces = [MediaType.TEXT_PLAIN])
-    fun randomSecret(): String {
-        logger.log("${Instant.now()} [>] /totp/new")
-        return totpService.generateSecret().base32Encoded
+    fun randomSecret(
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
+        logger.log(endpointLogMessage(request, request.path))
+        return ok(totpService.generateSecret().base32Encoded)
     }
 
 
@@ -88,8 +96,9 @@ class TotpController(
         @PathVariable("id") id: String,
         @PathVariable("ttl") rawTtl: String,
         @PathVariable("secret") secret: String,
+        request: HttpRequest<*>,
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /totp/save/$id/$rawTtl/*****")
+        logger.log(endpointLogMessage(request, "/totp/save/$id/$rawTtl/**********"))
 
         if (!serviceAvailable()) return unavailable()
         if (id.isEmpty()) return bad("Invalid ID")
@@ -106,9 +115,10 @@ class TotpController(
     // delete totp secret by ID
     @Get("/delete/{id}", produces = [MediaType.TEXT_PLAIN])
     fun deleteSecret(
-        @PathVariable("id") id: String
+        @PathVariable("id") id: String,
+        request: HttpRequest<*>
     ): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /totp/delete/$id")
+        logger.log(endpointLogMessage(request, request.path))
         if (id.isEmpty()) return bad("Invalid ID")
 
         authService.removeIdTokens(id)
@@ -121,8 +131,10 @@ class TotpController(
 
     // list of available IDs
     @Get("/list", produces = [MediaType.TEXT_PLAIN])
-    fun idList(): HttpResponse<String> {
-        logger.log("${Instant.now()} [>] /totp/list")
+    fun idList(
+        request: HttpRequest<*>
+    ): HttpResponse<String> {
+        logger.log(endpointLogMessage(request, request.path))
         val r = totpService.getIdList()
 
         val s = StringBuilder()

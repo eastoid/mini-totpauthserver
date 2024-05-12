@@ -1,12 +1,18 @@
 package totpauthserver.controller
 
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import jakarta.inject.Inject
+import totpauthserver.service.SecurityService
 import totpauthserver.service.serviceAvailable
 import java.time.Instant
 
 
-abstract class BaseController {
+abstract class BaseController() {
+
+    @Inject
+    private lateinit var securityService: SecurityService
 
     protected fun unavailable(): HttpResponse<String> {
         return HttpResponse.status<String?>(HttpStatus.valueOf(500)).body("Service is unavailable due to some internal error!")
@@ -26,6 +32,27 @@ abstract class BaseController {
 
     protected fun internal(body: String): HttpResponse<String> {
         return HttpResponse.status<String?>(HttpStatus.INTERNAL_SERVER_ERROR).body(body)
+    }
+
+    protected fun rateLimited(body: String = "Too many requests"): HttpResponse<String> {
+        return HttpResponse.status<String?>(HttpStatus.TOO_MANY_REQUESTS).body(body)
+    }
+
+    protected fun shouldRateLimit(request: HttpRequest<*>, path: String, interval: Long): Boolean {
+        securityService.getRealIp(request)?.let { ip ->
+            return (securityService.rateLimitIp(ip, path, interval,))
+        }
+        return false
+    }
+
+    protected fun HttpRequest<*>.realIp(): String? {
+        return securityService.getRealIp(this)
+    }
+
+    protected fun timeNow(): Instant = Instant.now()
+
+    protected fun endpointLogMessage(request: HttpRequest<*>, path: String): String {
+        return "${timeNow()}  ${request.realIp() ?: "no-ip-found"}  [>]  $path"
     }
 
     protected fun helpText(): String {

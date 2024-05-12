@@ -10,10 +10,14 @@ Uses Micronaut framework
 
 Do not expose the server port, TOTP secret deleting and adding is not authenticated.
 
+When using docker, to prevent exposing the port, use `127.0.0.1:xxxx:xxxx` to bind the port instead of `xxxx:xxxx`<br>otherwise docker will expose automatically.
+
 Secrets cannot be viewed via http and must be inspected in secrets.json.
 
 ---
 ### Environment variables
+
+Variable `RUNNING_DOCKERIZED`=`true` must exist to detect docker
 
 - To change the location of the secrets save file, change `SECRETFOLDER` variable to the parent folder of the json.
 
@@ -46,6 +50,10 @@ If secrets.json becomes corrupted or inaccessible, certain functions such as sav
 Default locations:
 - Windows: `C:\ProgramData\totpauthserver\secrets.json` - %ALLUSERSPROFILE%
 - Linux: `/etc/totpauthserver/secrets.json`
+
+The /login endpoint has a simple rate limiter to prevent brute force attacks, based on IP.<br>The limiter is OFF if there isnt an `X-Forwarded-For` header found!
+
+Most requests (Internal and external) are logged in console & log. It includes: time, external IP (if found in header), path.<br>Endpoints such as /auth/verify are not logged due to constant use.
 
 ---
 
@@ -107,43 +115,54 @@ Verify a TOTP code
 
 Server accessible on port 8082
 
-Change the internal `/authrequest` endpoint to contain the appropriate totp ID for your authenticated service, so that only the correct TOTP can be used to log in
+Change the internal `/authrequest` endpoint to contain the appropriate totp ID for your authenticated service, so that only the correct TOTP can be used to log in.
 
-``` 
-location /auth/login {
-    auth_request off;
-    proxy_pass http://127.0.0.1:8082/auth/login;
-}
+X-Forwarded-For header must be present for rate limiting.<br>If it isnt present, rate limiting will be disabled.
 
-location /totp/list {
-    auth_request off;
-    proxy_pass http://127.0.0.1:8082/totp/list;
-}
+```
+server {
 
-location = /authrequest {
-    internal;
-    proxy_pass http://127.0.0.1:8082/auth/verify/exampleId;  # App-specific ID
-    proxy_set_header Content-Length "";
-    proxy_pass_request_body off;
-    proxy_set_header Cookie $http_cookie;
-    proxy_set_header X-Original-URI $request_uri;
-}
+    listen 8082 ssl;
+	
+    # other configuration ...
+    
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    
 
-location /unauthorized {
-    internal;
-    proxy_pass http://127.0.0.1:8082/auth/loginpage;
-}
+    location /auth/login {
+        auth_request off;
+        proxy_pass http://127.0.0.1:8082/auth/login;
+    }
 
-location /myLogoutPath {
-    auth_request /authrequest;
-    error_page 401 403 =200 /unauthorized;
-    proxy_pass http://127.0.0.1:8082/auth/logout/exampleId;  # App-specific ID
-}
+    location /totp/list {
+        auth_request off;
+        proxy_pass http://127.0.0.1:8082/totp/list;
+    }
 
-location / {
-    auth_request /authrequest;
-    error_page 401 403 =200 /unauthorized;
-    proxy_pass http://127.0.0.1:5800/;
+    location = /authrequest {
+        internal;
+        proxy_pass http://127.0.0.1:8082/auth/verify/exampleId;  # App-specific ID
+        proxy_set_header Content-Length "";
+        proxy_pass_request_body off;
+        proxy_set_header Cookie $http_cookie;
+    }
+
+    location /unauthorized {
+        internal;
+        proxy_pass http://127.0.0.1:8082/auth/loginpage;
+    }
+
+    location /myLogoutPath {
+        auth_request /authrequest;
+        error_page 401 403 =200 /unauthorized;
+        proxy_pass http://127.0.0.1:8082/auth/logout/exampleId;  # App-specific ID
+    }
+
+    location / {
+        auth_request /authrequest;
+        error_page 401 403 =200 /unauthorized;
+        proxy_pass http://127.0.0.1:5800/;
+    }
 }
 ```
 
@@ -151,4 +170,4 @@ location / {
 
 ### Other information
 
-Homepage uses **compiled** Tailwind CSS. 
+Homepage uses compiled Tailwind CSS 

@@ -12,7 +12,7 @@ class LogService {
     fun log(message: String) {
         log.add(message)
         println(message)
-        if (log.size > 200) {
+        while (log.size > 200) {
             log.poll()
         }
     }
