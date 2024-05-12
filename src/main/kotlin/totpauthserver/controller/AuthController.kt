@@ -52,7 +52,6 @@ class AuthController(
         @PathVariable("id") id: String,
         request: HttpRequest<*>
     ): HttpResponse<String> {
-        logger.log(endpointLogMessage(request, request.path))
         if (id.isEmpty()) return bad("Bad service ID [$id]")
 
         val cookie = request.cookies?.get("authtoken-$id")?.value
