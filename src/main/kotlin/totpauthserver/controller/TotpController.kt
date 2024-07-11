@@ -138,16 +138,17 @@ class TotpController(
         val r = totpService.getIdList()
 
         val s = StringBuilder()
-        fun StringBuilder.space(): StringBuilder { this.append("        ").appendLine(); return this }
 
         if (!serviceAvailable()) {
-            s.append("(i) The service is currently unavailable").space()
+            s.append("(i) The service is currently unavailable")
         }
-        s.append("[==  ${r.size} IDs available  ==]").space()
+        s.append("[==  ${r.size} IDs available  ==]")
         r.forEach {
-            s.append(it).space()
+            s.appendLine()
+            s.append(it)
         }
-        s.space().space().append("[==  END  ==]")
+        s.appendLine()
+        s.append("[==  END  ==]")
 
         return ok(s.toString())
     }

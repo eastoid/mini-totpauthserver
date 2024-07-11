@@ -6,6 +6,21 @@ Uses Micronaut framework
 
 ---
 
+### Docker
+[Available on docker hub](https://hub.docker.com/r/5mrd/totpauthserver)
+
+```
+sudo docker run \
+    -d \
+    --restart unless-stopped \
+    --name totpauthserver \
+    -p 127.0.0.1:8082:8080 \
+    -v /etc/totp-auth-server:/etc/totp-auth-server \
+    5mrd/totpauthserver:latest
+```
+
+---
+
 ### Warning
 
 Do not expose the server port, TOTP secret deleting and adding is not authenticated.
@@ -129,12 +144,12 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     
 
-    location /auth/login {
+    location /tas/auth/login {
         auth_request off;
         proxy_pass http://127.0.0.1:8082/auth/login;
     }
 
-    location /totp/list {
+    location /tas/totp/list {
         auth_request off;
         proxy_pass http://127.0.0.1:8082/totp/list;
     }

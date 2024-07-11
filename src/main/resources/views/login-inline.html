@@ -573,7 +573,7 @@
                 event.preventDefault();
                 const formData = new FormData(loginForm);
 
-                fetch('/auth/login', {
+                fetch('/tas/auth/login', {
                     method: 'POST',
                     body: formData,
                 }).then(response => response.text())
@@ -590,7 +590,7 @@
 
             // Handle button click to load ID list
             loadIdListButton.addEventListener('click', function() {
-                fetch('/totp/list')
+                fetch('/tas/totp/list')
                     .then(response => response.text())
                     .then(data => {
                         listResponsePre.textContent = data;
