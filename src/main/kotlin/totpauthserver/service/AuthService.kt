@@ -30,16 +30,16 @@ class AuthService(
     }
 
 
-    fun logout(id: String, token: String) {
+    fun logout(token: String) {
         tokens.remove(token)
     }
 
-    fun reload(logout: Boolean, ) {
+    fun reload(logout: Boolean) {
         if (logout) tokens.clear()
         expirations.clear()
     }
 
-    fun authToken(token: String, id: String, ): Boolean {
+    fun authToken(token: String, id: String): Boolean {
         removeExpiredTokens()
         val info = tokens[token] ?: return false
         if (info.issuedAt.isExpired(info.id)) {
@@ -49,6 +49,23 @@ class AuthService(
 
         if (info.id != id) return false
         return true
+    }
+
+    fun authToken(cookies: List<String>, ids: List<String>): Boolean {
+        removeExpiredTokens()
+
+        cookies.forEach { cookie ->
+            let {
+                val info = tokens[cookie] ?: return@let
+                if (info.issuedAt.isExpired(info.id)) {
+                    tokens.remove(cookie)
+                }
+
+                if (ids.contains(info.id)) return true
+            }
+        }
+
+        return false
     }
 
     private fun removeExpiredTokens() {

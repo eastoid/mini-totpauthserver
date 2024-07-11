@@ -87,7 +87,7 @@ Generate TOTP secret
 
 
 `/auth/logout/{id}`
-Logs client out of specific ID
+Logs client out of specific ID<br>Separate IDs with comma
 
 
 `/totp/reload/{logout}`
@@ -98,7 +98,7 @@ Below endpoints return <ins>200</ins> "ok" or <ins>401</ins> "unauthorized" (or 
 
 
 `/auth/verify/{id}`
-Authenticate a client token (via cookie)
+Authenticate a client token (via cookie)<br>To allow multiple IDs on an endpoint, separate with comma
 
 
 `/auth/verify/{id}/{token}`
@@ -122,7 +122,7 @@ X-Forwarded-For header must be present for rate limiting.<br>If it isnt present,
 ```
 server {
 
-    listen 8082 ssl;
+    listen 8443 ssl;
 	
     # other configuration ...
     
@@ -141,7 +141,7 @@ server {
 
     location = /authrequest {
         internal;
-        proxy_pass http://127.0.0.1:8082/auth/verify/exampleId;  # App-specific ID
+        proxy_pass http://127.0.0.1:8082/auth/verify/exampleId,otherId;  # App-specific ID
         proxy_set_header Content-Length "";
         proxy_pass_request_body off;
         proxy_set_header Cookie $http_cookie;
@@ -155,7 +155,7 @@ server {
     location /myLogoutPath {
         auth_request /authrequest;
         error_page 401 403 =200 /unauthorized;
-        proxy_pass http://127.0.0.1:8082/auth/logout/exampleId;  # App-specific ID
+        proxy_pass http://127.0.0.1:8082/auth/logout/exampleId,otherId;  # App-specific ID
     }
 
     location / {
@@ -167,7 +167,3 @@ server {
 ```
 
 ---
-
-### Other information
-
-Homepage uses compiled Tailwind CSS 

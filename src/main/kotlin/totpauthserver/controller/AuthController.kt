@@ -53,11 +53,12 @@ class AuthController(
         request: HttpRequest<*>
     ): HttpResponse<String> {
         if (id.isEmpty()) return bad("Bad service ID [$id]")
+        val ids = id.split(",")
 
-        val cookie = request.cookies?.get("authtoken-$id")?.value
-        if (cookie.isNullOrBlank()) return unauthorized("unauthorized")
+        val cookies = request.cookies?.all?.filter { it.name.startsWith("authtoken-") }?.filter { it.name.substringAfter("authtoken-") in id }?.map { it.value }
+        if (cookies.isNullOrEmpty()) return unauthorized("unauthorized")
 
-        val auth = authService.authToken(cookie, id)
+        val auth = authService.authToken(cookies, ids)
         if (auth) return ok("ok")
         return unauthorized("unauthorized")
     }
@@ -113,19 +114,22 @@ class AuthController(
     ): HttpResponse<String> {
         logger.log(endpointLogMessage(request, request.path))
         if (id.isEmpty()) return bad("Invalid ID")
+        val ids = id.split(",")
 
-        val cookie = request.cookies?.get("authtoken-$id")?.value
-        if (!cookie.isNullOrBlank()) {
-            authService.logout(id, cookie)
+        val newCookies = mutableSetOf<Cookie>()
+        request.cookies?.all?.filter { it.name.substringAfter("authtoken-") in ids }?.forEach { cookie ->
+            authService.logout(cookie.value)
+            newCookies.add(
+                Cookie.of(cookie.name, "logout-${Instant.now()}").apply {
+                    maxAge(60)
+                    path("/")
+                    httpOnly(true)
+                    secure(true)
+                }
+            )
         }
 
-        val newCookie = Cookie.of("authtoken-$id", "logout-${Instant.now()}").apply {
-            maxAge(60)
-            path("/")
-            httpOnly(true)
-            secure(true)
-        }
-        return HttpResponse.ok<String?>().body("Logout [$id]").cookie(newCookie)
+        return HttpResponse.ok<String?>().body("Logout [$id]").cookies(newCookies)
     }
 
 }

@@ -57,6 +57,8 @@ abstract class BaseController() {
 
     protected fun helpText(): String {
         return """
+            ###
+            
             Backend TOTP authenticator  |  ${Instant.now()}
             Available: ${serviceAvailable()}
             
@@ -80,6 +82,7 @@ abstract class BaseController() {
             /logs/{amount}
             
             # Authenticate a client token (via cookie)
+            # Separate multiple IDs with comma - /verify/myId,otherId
             # 200 "ok" or 401 "unauthorized"
             /auth/verify/{id}
             
@@ -106,6 +109,7 @@ abstract class BaseController() {
             /auth/login
             
             # Logs client out of specific ID
+            # Separate multiple IDs with comma - /verify/myId,otherId
             /auth/logout/{id}
             
             # Reloads secrets from the file, with logout all users option (boolean)
@@ -113,6 +117,8 @@ abstract class BaseController() {
             
             
             https://github.com/eastoid/mini-totpauthserver
+            
+            ###
         """.trimIndent()
     }
 
